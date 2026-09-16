@@ -5,7 +5,6 @@
 	import type { LevelDrawConfig } from './presets';
 	import { distance, measureText } from '$lib/utils';
 	import { type SelectionEntry, cmpPositionEntry, cmpSelection } from './helpers';
-	import '../../styles/app.css';
 
 	interface Props {
 		solutionLength?: number;
