@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { drawChar, drawStart, drawSolution } from './draw';
+	import { drawChar, drawStart, drawSolution, getLineWidth, getRadius } from './draw';
 	import type { PositionEntry } from './logic';
 	import type { LevelDrawConfig } from './presets';
 	import { distance, measureText } from '$lib/utils';
@@ -15,14 +15,26 @@
 		config: LevelDrawConfig;
 		positions: PositionEntry[];
 		enableControls?: boolean;
+		canvas?: HTMLCanvasElement | null;
+		notGeneratedText?: string;
 	}
 
-	let { solutionLength, hasCalculated, config, positions, showSolution, enableControls }: Props =
-		$props();
+	let {
+		solutionLength,
+		hasCalculated,
+		config,
+		positions,
+		showSolution,
+		enableControls,
+		canvas = $bindable(),
+		notGeneratedText = 'Level has not been calculated yet.'
+	}: Props = $props();
 
-	let canvas: HTMLCanvasElement | null = $state(null);
-	const radius = $derived(config.FONT_SIZE_PX / 1.5);
-	const lineWidth = $derived(config.FONT_SIZE_PX / 10);
+	// let canvas = $state<HTMLCanvasElement | null>(null);
+	let ctx = $derived(canvas?.getContext('2d'));
+
+	const radius = $derived(getRadius(config));
+	const lineWidth = $derived(getLineWidth(config));
 	const COLOR_HOVER = 'lightgray';
 	const COLOR_SELECTION = '#aaaaaa';
 
@@ -55,8 +67,6 @@
 		mouseIsDragging = null;
 
 		if (!enableControls) return;
-
-		const ctx = canvas?.getContext('2d');
 		if (!ctx) return;
 
 		const nearest = getNearestChar(ctx, event.offsetX, event.offsetY);
@@ -70,10 +80,6 @@
 
 	function onMouseDown(event: MouseEvent) {
 		if (!enableControls) return;
-
-		if (!canvas) return;
-
-		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
 
 		const nearest = getNearestChar(ctx, event.offsetX, event.offsetY);
@@ -136,9 +142,6 @@
 
 	function onMouseMove(event: MouseEvent) {
 		if (!enableControls) return;
-
-		if (!canvas) return;
-		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
 
 		clear();
@@ -149,9 +152,6 @@
 
 		if (mouseIsDragging) {
 			draw(mouseIsDragging);
-
-			const ctx = canvas.getContext('2d');
-			if (!ctx) return;
 
 			// Line goes above characters
 			const [startX, startY] = mouseIsDragging;
@@ -203,7 +203,6 @@
 	}
 
 	function clear() {
-		const ctx = canvas?.getContext('2d');
 		if (!ctx) return;
 		ctx.clearRect(0, 0, config.WIDTH, config.HEIGHT);
 	}
@@ -241,13 +240,24 @@
 			>
 				Submit
 			</button>
-			<button
-				type="button"
-				disabled={selectedSolution.length === 0}
-				onclick={() => (selection = [])}
-			>
-				Clear
-			</button>
+			{#if selection.length > 0}
+				<button
+					type="button"
+					disabled={selectedSolution.length === 0}
+					onclick={() => (selection = [])}
+				>
+					Clear
+				</button>
+				<button
+					type="button"
+					disabled={selectedSolution.length === 0}
+					onclick={() => {
+						selection.pop();
+					}}
+				>
+					Undo
+				</button>
+			{/if}
 		</div>
 	{/if}
 
@@ -266,7 +276,7 @@
 
 		{#if !hasCalculated}
 			<div class="loading-overlay">
-				<p>Level has not been calculated yet.</p>
+				<p>{notGeneratedText}</p>
 			</div>
 		{/if}
 	</div>
@@ -277,6 +287,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
+		width: fit-content;
 	}
 
 	.controls {
@@ -307,10 +318,12 @@
 		font-size: 1.5rem;
 		color: #333;
 		z-index: 10;
+		pointer-events: none;
 	}
 
-	.flex-col {
-		display: flex;
-		flex-direction: column;
+	@media print {
+		.controls {
+			display: none;
+		}
 	}
 </style>

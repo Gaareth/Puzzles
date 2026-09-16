@@ -23,6 +23,7 @@ type ColorConnectBaseConfig = {
 		FIND_FORM: number;
 		OPTIMIZER: number;
 	};
+	GRAY_SPAWN_CHANCE: number; // out of 1
 	MIN_MIXUP_DIFF: number;
 };
 
@@ -61,12 +62,36 @@ export class ColorConnect {
 	idxToPositionPointer: Map<number, number>;
 	config: ColorConnectConfig;
 	hasCalculated: boolean = false;
+	preForm: Position[] | null;
 
-	constructor(solution: string, config: ColorConnectConfig) {
+	constructor(solution: string, config: ColorConnectConfig, preForm: Position[] | null = null) {
 		this.solution = solution;
 		this.positions = [];
 		this.idxToPositionPointer = new Map();
 		this.config = config;
+		this.preForm = preForm;
+
+		if (preForm) {
+			this._fillPreForm();
+		}
+	}
+
+	_fillPreForm() {
+		const form = [];
+		if (!this.preForm) return;
+		for (let i = 0; i < this.preForm.length; i++) {
+			const pos = this.preForm[i];
+			const char = this.solution[i];
+			const color = this.config.COLORS[i % this.config.COLORS.length];
+			const positionEntry: PositionEntry = { pos, char, color, index: i };
+			this.positions.push(positionEntry);
+			this.idxToPositionPointer.set(i, i);
+			form.push(positionEntry);
+		}
+
+		// TODO: tryFind if preForm has less points than solution, and fill the rest with random positions and colors
+
+		return form;
 	}
 
 	getPositionByIndex(idx: number): PositionEntry | null {
@@ -99,8 +124,8 @@ export class ColorConnect {
 		const maxAttempts = this.config.MAX_ATTEMPTS.FIND_NON_OVERLAPPING_POSITION;
 
 		for (let attempts = 0; attempts < maxAttempts; attempts++) {
-			x = getRandomInclusive(this.config.PADDING, this.config.WIDTH - this.config.PADDING);
-			y = getRandomInclusive(this.config.PADDING, this.config.HEIGHT - this.config.PADDING);
+			x = getRandomInclusive(this.config.PADDING, this.config.WIDTH - this.config.PADDING - 1);
+			y = getRandomInclusive(this.config.PADDING, this.config.HEIGHT - this.config.PADDING - 1);
 
 			const isOverlapping = this.positions.some(({ pos: [px, py] }) => {
 				return distance([x, y], [px, py]) < min_dist;
@@ -158,7 +183,7 @@ export class ColorConnect {
 
 			// add gray in 50percent to colors
 			const colors = [...this.config.COLORS];
-			if (Math.random() < 0.05) {
+			if (Math.random() < this.config.GRAY_SPAWN_CHANCE) {
 				colors.push('gray');
 			}
 
@@ -219,7 +244,17 @@ export class ColorConnect {
 		return form;
 	}
 
+	_clear() {
+		this.positions = [];
+		this.idxToPositionPointer.clear();
+	}
+
 	tryFindValidForm() {
+		if (this.preForm) {
+			this._clear();
+			return this._fillPreForm();
+		}
+
 		const maxAttempts = this.config.MAX_ATTEMPTS.FIND_FORM;
 
 		let attempts = 0;
@@ -227,8 +262,7 @@ export class ColorConnect {
 		while (attempts < maxAttempts) {
 			attempts++;
 			// clear positions and idxToPosition for a fresh attempt
-			this.positions = [];
-			this.idxToPositionPointer.clear();
+			this._clear();
 
 			const formResult = this.findValidForm();
 			if (formResult == null) {
@@ -257,7 +291,21 @@ export class ColorConnect {
 		}
 	}
 
-	calculate(byBestFn: scoreLevel | null = null) {
+	_validatePositions() {
+		const solutionPositions = [];
+		for (const entry of this.idxToPositionPointer.values()) {
+			const positionEntry = this.positions[entry];
+			if (positionEntry.index != null) {
+				solutionPositions.push(positionEntry);
+			}
+		}
+		validate(solutionPositions, this.positions, this.config.MIN_MIXUP_DIFF, true, true);
+	}
+
+	calculate(
+		byBestFn: scoreLevel | null = null,
+		validateResult: boolean = true
+	): PositionEntry[] | null {
 		const maxAttempts = this.config.MAX_ATTEMPTS.OPTIMIZER;
 
 		let bestScore = -Infinity;
@@ -272,12 +320,16 @@ export class ColorConnect {
 				continue;
 			}
 
-			validate(this, true);
+			if (validateResult) {
+				this._validatePositions();
+			}
 
 			this.spray();
 
-			validate(this, true);
-			validateMinDistance(this);
+			if (validateResult) {
+				this._validatePositions();
+				validateMinDistance(this);
+			}
 
 			if (byBestFn == null) {
 				this.scramblePositions();
@@ -305,3 +357,4 @@ export class ColorConnect {
 		return null;
 	}
 }
+

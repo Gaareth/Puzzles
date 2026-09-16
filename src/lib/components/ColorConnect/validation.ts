@@ -1,20 +1,26 @@
 import { distance } from '$lib/utils';
-import type { ColorConnect, Position } from './logic';
+import type { ColorConnect, Position, PositionEntry } from './logic';
 
 /** Validate that all positions are valid and do not lead to mixups.
  * @param allow_previous_to_be_closer allows previous characters of the solution string to be closer than the next correct one.
  */
-export function validate(colorConnect: ColorConnect, allow_previous_to_be_closer = false): boolean {
+export function validate(
+	solutionPositions: PositionEntry[],
+	allPositions: PositionEntry[],
+	min_mixup_diff: number,
+	allow_previous_to_be_closer = false,
+	throwOnError = false
+) {
 	// last one has no next one, so we can skip it
-	for (let i = 0; i < colorConnect.solution.length - 2; i++) {
-		const entryToCheck = colorConnect.getPositionByIndexAsserted(i);
-		const nextEntry = colorConnect.getPositionByIndexAsserted(i + 1);
+	for (let i = 0; i < solutionPositions.length - 2; i++) {
+		const entryToCheck = solutionPositions[i];
+		const nextEntry = solutionPositions[i + 1];
 
 		// distance less than that are not allowed
 		const distanceToNext = distance(entryToCheck.pos, nextEntry.pos);
 
 		// is there any entry which is closer to me, than my next correct one
-		for (const positionEntry of colorConnect.positions) {
+		for (const positionEntry of allPositions) {
 			if (positionEntry == entryToCheck || positionEntry == nextEntry) {
 				continue;
 			}
@@ -28,17 +34,27 @@ export function validate(colorConnect: ColorConnect, allow_previous_to_be_closer
 			}
 
 			const distanceToSelf = distance(entryToCheck.pos, positionEntry.pos);
-			if (distanceToSelf <= distanceToNext + colorConnect.config.MIN_MIXUP_DIFF) {
-				throw new Error(
-					`Validation failed: ${positionEntry.char} at index ${positionEntry.index} is too close to ${entryToCheck.char} at index ${i}. 
+			if (distanceToSelf <= distanceToNext + min_mixup_diff) {
+				if (throwOnError) {
+					throw new Error(
+						`Validation failed: ${positionEntry.char} at index ${positionEntry.index} is too close to ${entryToCheck.char} at index ${i}. 
 						Its closer than the next correct character ${nextEntry.char} at index ${i + 1}. 
 						Distance (${entryToCheck.char} to ${positionEntry.char}): ${distanceToSelf}, distance (${entryToCheck.char} to ${nextEntry.char}): ${distanceToNext}, 
-						MIN_MIXUP_DIFF: ${colorConnect.config.MIN_MIXUP_DIFF}`
-				);
+						MIN_MIXUP_DIFF: ${min_mixup_diff}`
+					);
+				}
+				return {
+					valid: false,
+					baseEntry: entryToCheck,
+					correctNextEntry: nextEntry,
+					confusableEntry: positionEntry
+				};
 			}
 		}
 	}
-	return true;
+	return {
+		valid: true
+	};
 }
 
 /// Checks that the position and color leads to no mixups

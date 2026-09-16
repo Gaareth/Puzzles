@@ -2,6 +2,9 @@ import { measureText, generateHueColorPalette, normalizeVector } from '$lib/util
 import type { PositionEntry } from './logic';
 import type { LevelDrawConfig } from './presets';
 
+export const getRadius = (config: LevelDrawConfig) => config.FONT_SIZE_PX / 1.5;
+export const getLineWidth = (config: LevelDrawConfig) => config.FONT_SIZE_PX / 10;
+
 export function drawStart(
 	ctx: CanvasRenderingContext2D,
 	position: PositionEntry,

@@ -31,6 +31,7 @@ const BASE_CONFIG = {
 		FIND_FORM: 1000,
 		OPTIMIZER: 10
 	},
+	GRAY_SPAWN_CHANCE: 0.05,
 	SYMBOLS: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' + greekAlphabet,
 	COLORS: ['red', 'green', 'blue']
 };
